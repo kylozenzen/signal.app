@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #app-title {
+            font-family: 'Orbitron', sans-serif;
+        }
+        #shape-visualizer, #shape-visualizer > * { transition: transform 1s ease-in-out; }
+        .selected-option { transform: scale(1.05); box-shadow: 0 0 0 3px currentColor; }
+        ::-webkit-scrollbar { display: none; }
+        -ms-overflow-style: none; scrollbar-width: none;
+        .screen { transition: opacity 0.5s ease-in-out; }
+        #animated-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        
+        .neon-glow-fuchsia { filter: drop-shadow(0 0 4px #be185d) drop-shadow(0 0 12px #be185d); }
+        .neon-glow-cyan { filter: drop-shadow(0 0 4px #0891b2) drop-shadow(0 0 12px #0891b2); }
+        .neon-glow-lime { filter: drop-shadow(0 0 4px #65a30d) drop-shadow(0 0 12px #65a30d); }
+        .neon-glow-teal { filter: drop-shadow(0 0 4px #0d9488) drop-shadow(0 0 12px #0d9488); }
+        .neon-glow-sky { filter: drop-shadow(0 0 4px #0ea5e9) drop-shadow(0 0 12px #0ea5e9); }
+        .neon-glow-indigo { filter: drop-shadow(0 0 4px #4f46e5) drop-shadow(0 0 12px #4f46e5); }
+        .neon-glow-gold { filter: drop-shadow(0 0 4px #d97706) drop-shadow(0 0 12px #d97706); }
+        .neon-glow-amber { filter: drop-shadow(0 0 4px #f59e0b) drop-shadow(0 0 12px #f59e0b); }
+        .neon-glow-rose { filter: drop-shadow(0 0 4px #e11d48) drop-shadow(0 0 12px #e11d48); }
+
+        .toggle-checkbox:checked { background-color: currentColor; }
+        .toggle-checkbox:checked + .toggle-label { transform: translateX(100%); }
+        
+        @keyframes bounce { 0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8,0,1,1); } 50% { transform: translateY(0); animation-timing-function: cubic-bezier(0,0,0.2,1); } }
+        .animate-bounce-slow { animation: bounce 1.5s infinite; }
+        .tab-active { background-color: rgba(255,255,255,0.1); }
+
+        #main-menu-panel, #side-menu {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        #tutorial-spotlight {
+            position: absolute;
+            border: 3px dashed white;
+            border-radius: 12px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+            pointer-events: none;
+            transition: all 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body class="antialiased text-white">
+
+    <canvas id="animated-bg"></canvas>
+
+    <div id="app-container" class="w-full h-screen relative">
+        <!-- Main Menu Drawer -->
+        <div id="side-menu-container">
+            <button id="main-menu-toggle" class="absolute top-0 left-0 m-4 w-12 h-12 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm z-40">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div id="side-menu-overlay" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+            <div id="side-menu" class="fixed top-0 left-0 h-full w-64 bg-black/50 backdrop-blur-lg p-6 transform -translate-x-full z-50">
+                <h2 class="text-2xl font-bold orbitron mb-8">Signal</h2>
+                <nav class="flex flex-col gap-2">
+                    <button id="menu-breathing-btn" class="text-left p-3 rounded-lg text-lg">Breathe</button>
+                    <button id="menu-focus-btn" class="text-left p-3 rounded-lg text-lg">Focus</button>
+                    <button id="menu-progress-btn" class="text-left p-3 rounded-lg text-lg">Progress</button>
+                    <button id="menu-meditate-btn" class="text-left p-3 rounded-lg text-lg text-gray-500 cursor-not-allowed hidden" disabled>Meditate <span class="text-xs font-light">(Soon)</span></button>
+                    <button id="menu-journal-btn" class="text-left p-3 rounded-lg text-lg text-gray-500 cursor-not-allowed hidden" disabled>Journal <span class="text-xs font-light">(Soon)</span></button>
+                    <div class="border-t border-white/10 my-4"></div>
+                    <button id="menu-settings-btn" class="text-left p-3 rounded-lg text-lg">Settings</button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- ===================== START SCREEN ==================== -->
+        <!-- ======================================================= -->
+        <div id="start-screen" class="screen flex flex-col items-center justify-center min-h-screen p-6">
+            <div class="text-center p-6 md:p-8 rounded-2xl">
+                <h1 id="app-title" class="text-5xl md:text-7xl font-bold mb-8 cursor-pointer select-none">Signal</h1>
+                <div id="start-quote-display" class="h-12 text-sm text-gray-400 mb-12">
+                    <p id="start-quote-text"></p>
+                    <p id="start-quote-author" class="mt-1 text-xs text-white/30"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Other Screens (Focus, Settings, Breathing, Progress) -->
+        <!-- Focus Screen -->
+        <div id="focus-screen" class="screen hidden absolute top-0 left-0 w-full h-full flex flex-col p-6">
+             <div class="absolute top-0 right-0 p-6 z-20">
+                 <button id="focus-back-btn" class="px-4 py-2 rounded-lg text-sm font-semibold">Back</button>
+             </div>
+             <div class="flex-grow flex flex-col items-center justify-center text-center">
+                 <p id="focus-timer-message" class="text-2xl sm:text-3xl font-medium mb-4 h-8"></p>
+                 <p id="focus-timer-display" class="text-7xl sm:text-9xl font-bold">25:00</p>
+                 <div id="focus-controls" class="mt-12 flex items-center gap-4">
+                     <button id="focus-start-btn">Start</button>
+                     <button id="focus-pause-btn" class="hidden"></button>
+                     <button id="focus-reset-btn" class="hidden">Reset</button>
+                 </div>
+             </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen hidden absolute top-0 left-0 w-full h-full flex items-center justify-center p-4">
+            <div id="settings-panel" class="w-full max-w-md mx-auto bg-black/30 backdrop-blur-sm p-4 rounded-2xl overflow-y-auto max-h-[90vh] relative">
+                <button id="settings-close-btn" class="absolute top-3 right-3 text-2xl text-white/50 hover:text-white z-20">&times;</button>
+                <h1 class="text-xl font-bold text-center mb-4">Settings</h1>
+                
+                <div class="flex justify-center border-b border-white/10 mb-4">
+                    <button id="tab-sessions" class="px-4 py-2 text-sm font-semibold flex-1">Sessions</button>
+                    <button id="tab-appearance" class="px-4 py-2 text-sm font-semibold flex-1">Appearance</button>
+                    <button id="tab-about" class="px-4 py-2 text-sm font-semibold flex-1">About</button>
+                </div>
+
+                <div id="sessions-settings-content" class="hidden space-y-4 pb-8">
+                    <div class="flex justify-center bg-black/20 p-1 rounded-lg">
+                        <button id="sub-tab-breathing" class="flex-1 py-1.5 text-sm rounded-md">Breathing</button>
+                        <button id="sub-tab-focus" class="flex-1 py-1.5 text-sm rounded-md">Focus</button>
+                    </div>
+                    <div id="breathing-settings-content" class="hidden space-y-4">
+                         <div>
+                            <h2 class="text-sm font-semibold mb-1">Breathing Method</h2>
+                            <div id="method-options" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold mb-1">Visual Shape</h2>
+                            <div id="shape-options" class="grid grid-cols-3 gap-2">
+                                 <button data-value="circle" class="option-btn p-2 h-16 rounded-lg flex items-center justify-center"><svg class="w-8 h-8 text-white/50 pointer-events-none" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="10"><circle cx="50" cy="50" r="45"/></svg></button>
+                                 <button data-value="square" class="option-btn p-2 h-16 rounded-lg flex items-center justify-center"><svg class="w-8 h-8 text-white/50 pointer-events-none" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="10"><rect x="5" y="5" width="90" height="90"/></svg></button>
+                                 <button data-value="triangle" class="option-btn p-2 h-16 rounded-lg flex items-center justify-center"><svg class="w-9 h-9 text-white/50 pointer-events-none" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="10"><path d="M50 5 L95 80 L5 80 Z"/></svg></button>
+                            </div>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold mb-1">Session Duration</h2>
+                            <div id="duration-options" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                 <button data-value="60" class="option-btn p-3 rounded-lg text-sm">1 Min</button>
+                                 <button data-value="180" class="option-btn p-3 rounded-lg text-sm">3 Min</button>
+                                 <button data-value="300" class="option-btn p-3 rounded-lg text-sm">5 Min</button>
+                                 <button data-value="Infinity" class="option-btn p-3 rounded-lg text-sm">Cont.</button>
+                            </div>
+                        </div>
+                         <div>
+                            <h2 class="text-sm font-semibold mb-2">Audio Guide</h2>
+                            <div class="bg-black/20 p-3 rounded-lg space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <label for="audio-toggle" class="text-white/80 text-sm">Enable Audio</label>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" id="audio-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="audio-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                 <div class="flex items-center justify-between">
+                                    <label for="volume-slider" class="text-white/80 text-sm">Volume</label>
+                                    <input type="range" id="volume-slider" min="-30" max="0" value="-10" class="w-1/2">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                     <div id="focus-settings-content" class="hidden space-y-4">
+                         <div>
+                            <h2 class="text-sm font-semibold mb-1 text-center">Focus Duration</h2>
+                            <div id="focus-duration-options" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                 <button data-value="900" class="option-btn p-3 rounded-lg text-sm">15 Min</button>
+                                 <button data-value="1500" class="option-btn p-3 rounded-lg text-sm">25 Min</button>
+                                 <button data-value="2700" class="option-btn p-3 rounded-lg text-sm">45 Min</button>
+                                 <button data-value="3600" class="option-btn p-3 rounded-lg text-sm">60 Min</button>
+                            </div>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold mb-2 text-center">Alert Sound</h2>
+                            <div class="bg-black/20 p-3 rounded-lg space-y-3">
+                                 <div class="flex items-center justify-between">
+                                    <label for="focus-audio-toggle" class="text-white/80 text-sm">Enable sound on complete</label>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" id="focus-audio-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="focus-audio-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="appearance-settings-content" class="hidden space-y-4 pb-8">
+                     <div>
+                        <h2 class="text-sm font-semibold mb-1">Theme</h2>
+                        <div id="theme-options" class="grid grid-cols-3 gap-2">
+                              <button data-value="constellation" class="option-btn p-2 h-12 rounded-lg text-sm">Constellation</button>
+                              <button data-value="ocean" class="option-btn p-2 h-12 rounded-lg text-sm">Deep Ocean</button>
+                              <button data-value="dunes" class="option-btn p-2 h-12 rounded-lg text-sm">Shifting Dunes</button>
+                        </div>
+                    </div>
+                    <div id="accent-color-container">
+                        <h2 class="text-sm font-semibold mb-1">Accent Color</h2>
+                        <div id="color-options" class="grid grid-cols-3 gap-2"></div>
+                    </div>
+                </div>
+                <div id="about-settings-content" class="hidden space-y-4 pb-8">
+                     <div class="space-y-4">
+                        <h2 class="text-sm font-semibold mb-1 text-center">Learn Techniques</h2>
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <div id="learn-method-list" class="flex flex-col gap-2 md:w-1/3"></div>
+                            <div class="md:w-2/3 bg-gray-900/50 p-4 rounded-lg min-h-[150px] md:min-h-full" id="learn-summary-container">
+                                <p id="learn-summary-text" class="text-gray-300"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <h2 class="text-sm font-semibold mb-1 text-center">App Guide</h2>
+                        <button id="replay-tutorial-btn" class="w-full p-3 rounded-lg text-sm">Replay Tutorial</button>
+                    </div>
+                </div>
+
+                <div id="scroll-indicator" class="sticky bottom-0 text-center hidden pointer-events-none h-12 bg-gradient-to-t from-black/80 via-black/50 to-transparent -mx-4">
+                    <p class="text-xs animate-bounce-slow pt-6">Scroll for more</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Breathing Session Screen -->
+        <div id="session-screen" class="screen hidden absolute top-0 left-0 w-full h-full flex flex-col p-6">
+            <div class="absolute top-0 right-0 p-6 z-20">
+                <button id="session-back-btn" class="px-4 py-2 rounded-lg text-sm font-semibold">Back</button>
+            </div>
+            <div class="flex-grow flex flex-col items-center justify-center text-center">
+                <div id="shape-container" class="w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center">
+                    <div id="shape-visualizer" class="w-full h-full"></div>
+                </div>
+                <div id="session-controls" class="mt-20 sm:mt-24">
+                    <div id="session-instructions" class="h-20 sm:h-22 hidden">
+                         <p id="instruction-text" class="text-2xl sm:text-3xl font-medium h-8"></p>
+                         <p id="step-countdown-text" class="text-2xl sm:text-3xl font-bold mt-2 h-12 sm:h-14"></p>
+                    </div>
+                     <button id="session-start-btn">Start</button>
+                     <div id="session-active-controls" class="flex items-center gap-4 hidden">
+                         <p id="timer-text" class="text-sm text-white/70 w-24 text-left"></p>
+                         <button id="pause-resume-btn" class="w-10 h-10 flex items-center justify-center"></button>
+                         <button id="end-session-btn" class="hidden">End</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Screen -->
+        <div id="progress-screen" class="screen hidden absolute top-0 left-0 w-full h-full flex flex-col p-4 sm:p-6">
+            <div class="absolute top-0 right-0 p-4 sm:p-6 z-20">
+                <button id="progress-back-btn" class="px-4 py-2 rounded-lg text-sm font-semibold">Back</button>
+            </div>
+             <div class="w-full max-w-2xl mx-auto flex-grow flex flex-col pt-20">
+                <h1 class="text-3xl sm:text-4xl font-bold orbitron mb-8 text-center">Your Progress</h1>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-center">
+                    <div class="bg-black/20 p-4 rounded-xl">
+                        <p class="text-3xl font-bold" id="stats-total-sessions">0</p>
+                        <p class="text-sm text-white/60">Total Sessions</p>
+                    </div>
+                    <div class="bg-black/20 p-4 rounded-xl">
+                        <p class="text-3xl font-bold" id="stats-total-time">0</p>
+                        <p class="text-sm text-white/60">Total Minutes</p>
+                    </div>
+                    <div class="bg-black/20 p-4 rounded-xl">
+                        <p class="text-3xl font-bold" id="stats-streak">0</p>
+                        <p class="text-sm text-white/60">Day Streak</p>
+                    </div>
+                </div>
+                <h2 class="text-lg font-semibold mb-4 text-center">Recent Activity</h2>
+                <div id="recent-sessions-list" class="flex-grow bg-black/20 rounded-xl p-4 overflow-y-auto">
+                    <p class="text-center text-white/40">No sessions completed yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODALS -->
+        <!-- Breathing Settings Reminder Modal -->
+        <div id="breathing-settings-modal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
+            <div class="bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 text-center max-w-sm mx-auto">
+                <h2 class="text-xl font-bold mb-3">Customize Your Session?</h2>
+                <p class="text-gray-400 mb-6 text-sm">You can change the breathing technique, visual shape, theme, and duration in the settings.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="reminder-continue-btn" class="px-4 py-2 rounded-lg">Continue</button>
+                    <button id="reminder-settings-btn" class="px-4 py-2 rounded-lg">Go to Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tutorial Modal -->
+        <div id="tutorial-overlay" class="fixed inset-0 z-[100] hidden">
+             <div id="tutorial-spotlight"></div>
+             <div id="tutorial-modal" class="fixed bottom-4 left-0 right-0 bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 max-w-md w-11/12 mx-auto text-center transform translate-y-[200%] transition-transform duration-300">
+                <h3 id="tutorial-title" class="text-lg font-bold mb-2"></h3>
+                <p id="tutorial-text" class="text-gray-300 text-sm mb-4"></p>
+                <div class="flex justify-between items-center">
+                    <button id="tutorial-skip-btn" class="text-xs text-gray-500 hover:text-white">Skip</button>
+                    <div class="flex gap-2">
+                        <button id="tutorial-prev-btn" class="px-4 py-1.5 rounded-lg text-sm">Prev</button>
+                        <button id="tutorial-next-btn" class="px-4 py-1.5 rounded-lg text-sm">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- CONFIGURATION DATA ---
+    const breathingMethods = { 
+        '4-7-8': { name: '4-7-8', short: 'Relax', steps: [{ text: 'Breathe In', time: 4, scale: 1.5 }, { text: 'Hold', time: 7, scale: 1.5 }, { text: 'Breathe Out', time: 8, scale: 1 }], summary: "Known as the 'Relaxing Breath,' this technique can help with anxiety and sleep. The long exhale helps calm the nervous system." },
+        'box': { name: 'Box', short: 'Focus', steps: [{ text: 'Breathe In', time: 4, scale: 1.5 }, { text: 'Hold', time: 4, scale: 1.5 }, { text: 'Breathe Out', time: 4, scale: 1 }, { text: 'Hold', time: 4, scale: 1 }], summary: "Used by Navy SEALs, this technique is excellent for focus and stress control. The equal-sided counts help regulate the body's natural rhythm." },
+        '4-8': { name: '4-8', short: 'Calm', steps: [{ text: 'Breathe In', time: 4, scale: 1.5 }, { text: 'Breathe Out', time: 8, scale: 1 }], summary: "By making the exhale twice as long as the inhale, this method activates the 'rest and digest' response, promoting deep relaxation." },
+        'sigh': { name: 'Sigh', short: 'Reset', steps: [{ text: 'Inhale', time: 1.5, scale: 1.3 }, { text: 'Inhale Again', time: 1, scale: 1.5 }, { text: 'Long Exhale', time: 6, scale: 1 }], summary: "This is the body's fastest natural way to reset stress. The double inhale pops open tiny air sacs in the lungs, allowing for a more efficient release of carbon dioxide." },
+        '7-11': { name: '7/11', short: 'Anxiety', steps: [{ text: 'Breathe In', time: 7, scale: 1.5 }, { text: 'Breathe Out', time: 11, scale: 1 }], summary: "A powerful technique for managing anxiety and panic. The extended exhale signals the brain to slow down, reducing feelings of being overwhelmed." },
+        '5-5': { name: '5-5', short: 'Coherent', steps: [{ text: 'Breathe In', time: 5, scale: 1.5 }, { text: 'Breathe Out', time: 5, scale: 1 }], summary: "This simple, balanced breath helps synchronize your heart rate and breathing, leading to a state of calm coherence and improved cardiovascular function." },
+        'pursed': { name: '2-4', short: 'Pursed Lip', steps: [{ text: 'Breathe In', time: 2, scale: 1.5 }, { text: 'Breathe Out', time: 4, scale: 1 }], summary: "Often taught for managing shortness of breath, this technique slows the breathing pace and makes each breath more effective by keeping airways open longer." },
+        'ujjayi': { name: 'Ujjayi', short: 'Yoga', steps: [{ text: 'Breathe In', time: 4, scale: 1.5 }, { text: 'Breathe Out', time: 6, scale: 1 }], summary: "Known as 'Victorious Breath' in yoga, this technique involves constricting the throat slightly to create a soft, ocean-like sound, which helps build internal heat and focus." }
+    };
+    const themes = {
+        constellation: {
+            name: 'Constellation',
+            renderer: animateConstellation,
+            colors: {
+                fuchsia: { name: 'Fuchsia', main: 'border-fuchsia-500', text: 'text-fuchsia-400', btn: 'border-fuchsia-600', hover: 'hover:bg-fuchsia-950/70', glow: 'neon-glow-fuchsia', stroke: 'rgba(224, 78, 202, 0.2)' },
+                cyan: { name: 'Cyan', main: 'border-cyan-500', text: 'text-cyan-400', btn: 'border-cyan-600', hover: 'hover:bg-cyan-950/70', glow: 'neon-glow-cyan', stroke: 'rgba(6, 182, 212, 0.2)' },
+                lime: { name: 'Lime', main: 'border-lime-500', text: 'text-lime-400', btn: 'border-lime-600', hover: 'hover:bg-lime-950/70', glow: 'neon-glow-lime', stroke: 'rgba(132, 204, 22, 0.2)' }
+            }
+        },
+        ocean: {
+            name: 'Deep Ocean',
+            renderer: animateOcean,
+            colors: {
+                teal: { name: 'Teal', main: 'border-teal-400', text: 'text-teal-300', btn: 'border-teal-500', hover: 'hover:bg-teal-950/70', glow: 'neon-glow-teal', stroke: 'rgba(45, 212, 191, 0.3)' },
+                sky: { name: 'Sky', main: 'border-sky-400', text: 'text-sky-300', btn: 'border-sky-500', hover: 'hover:bg-sky-950/70', glow: 'neon-glow-sky', stroke: 'rgba(56, 189, 248, 0.3)' },
+                indigo: { name: 'Indigo', main: 'border-indigo-400', text: 'text-indigo-300', btn: 'border-indigo-500', hover: 'hover:bg-indigo-950/70', glow: 'neon-glow-indigo', stroke: 'rgba(129, 140, 248, 0.3)' }
+            }
+        },
+        dunes: {
+            name: 'Shifting Dunes',
+            renderer: animateDunes,
+            colors: {
+                gold: { name: 'Gold', main: 'border-yellow-500', text: 'text-yellow-400', btn: 'border-yellow-600', hover: 'hover:bg-yellow-950/70', glow: 'neon-glow-gold', stroke: 'rgba(234, 179, 8, 0.5)' },
+                amber: { name: 'Amber', main: 'border-amber-500', text: 'text-amber-400', btn: 'border-amber-600', hover: 'hover:bg-amber-950/70', glow: 'neon-glow-amber', stroke: 'rgba(245, 158, 11, 0.5)' },
+                rose: { name: 'Rose', main: 'border-rose-500', text: 'text-rose-400', btn: 'border-rose-600', hover: 'hover:bg-rose-950/70', glow: 'neon-glow-rose', stroke: 'rgba(244, 63, 94, 0.5)' }
+            }
+        }
+    };
+    const shapes = { 
+        circle: `<svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="8"><circle cx="50" cy="50" r="45"/></svg>`, 
+        square: `<svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><path id="box-path" d="M 5 5 L 95 5 L 95 95 L 5 95 Z" /></svg>`,
+        triangle: `<svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><path d="M50 5 L95 80 L5 80 Z"/></svg>`
+    };
+    const icons = {
+        pause: `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`,
+        play: `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M5 4l14 8-14 8V4z"/></svg>`
+    };
+    const quotes = [ { text: "The only way to make sense out of change is to plunge into it, move with it, and join the dance.", author: "Alan Watts" }, { text: "This is the real secret of life -- to be completely engaged with what you are doing in the here and now. And instead of calling it work, realize it is play.", author: "Alan Watts" }, { text: "Muddy water is best cleared by leaving it alone.", author: "Alan Watts" }, { text: "The future is a concept, it doesn't exist. There is no such thing as tomorrow. There never will be, because time is always now.", author: "Alan Watts" }, { text: "To have faith is to trust yourself to the a water. When you swim you don't grab hold of the water, because if you do you will sink and drown. Instead you relax, and float.", author: "Alan Watts" }, { text: "The quieter you become, the more you are able to hear.", author: "Rumi" }, { text: "Within you, there is a stillness and a sanctuary to which you can retreat at any time and be yourself.", author: "Hermann Hesse" }, { text: "Feelings come and go like clouds in a windy sky. Conscious breathing is my anchor.", author: "Thich Nhat Hanh" } ];
+    const roasts = {
+        breathing: {
+            in: ["Breathe in... Try to use your lungs this time.", "Inhale. Are you even trying or just suggesting?", "Fill those lungs. I've seen balloons with more capacity."],
+            hold: ["Hold it. Don't pass out. Or do. Less work for me.", "Hold... Contemplate your questionable life choices.", "Just hold. It's not rocket science. It's air."],
+            out: ["Breathe out... Let go of your dreams. They weren't going anywhere.", "Exhale. Finally. I was about to call for help.", "Let it all out. Like you do on Twitter at 2 AM."]
+        },
+        focus: {
+            start: ["Alright, 25 minutes. Let's see how many times you check your phone. I'm setting the over/under at 12.", "Time to 'focus.' Sure. I'll be here when you get back from Wikipedia-ing the history of spoons.", "Begin. I'm sure this will be your most productive half-hour of staring blankly at a screen today."],
+            paused: ["Paused? Of course you paused. Focus is hard.", "Ah, a break. Can't handle the crushing weight of mild productivity, can we?", "The timer is paused, but the disappointment is ongoing."],
+            complete: ["Time's up. You did the bare minimum. Don't expect a parade.", "Finished. Go reward yourself with more procrastination.", "Congrats, you completed a task. Here's your 'Not a Total Failure' certificate. It's in the mail."]
+        }
+    };
+
+
+    // --- DOM ELEMENT REFERENCES ---
+    const animatedBg = document.getElementById('animated-bg');
+    const screens = { 
+        start: document.getElementById('start-screen'), 
+        settings: document.getElementById('settings-screen'), 
+        session: document.getElementById('session-screen'), 
+        focus: document.getElementById('focus-screen'),
+        progress: document.getElementById('progress-screen') 
+    };
+    const buttons = { 
+        // Main Menu
+        mainMenuToggle: document.getElementById('main-menu-toggle'),
+        menuBreathing: document.getElementById('menu-breathing-btn'),
+        menuFocus: document.getElementById('menu-focus-btn'),
+        menuProgress: document.getElementById('menu-progress-btn'),
+        menuSettings: document.getElementById('menu-settings-btn'),
+        
+        // Back/Close Buttons
+        settingsClose: document.getElementById('settings-close-btn'), 
+        focusBack: document.getElementById('focus-back-btn'),
+        sessionBack: document.getElementById('session-back-btn'),
+        progressBack: document.getElementById('progress-back-btn'),
+        
+        // Session Controls
+        sessionStart: document.getElementById('session-start-btn'),
+        pauseResume: document.getElementById('pause-resume-btn'), 
+        endSession: document.getElementById('end-session-btn'),
+
+        // Focus Controls
+        focusStart: document.getElementById('focus-start-btn'),
+        focusPause: document.getElementById('focus-pause-btn'),
+        focusReset: document.getElementById('focus-reset-btn'),
+        
+        // Settings/Modal Buttons
+        replayTutorial: document.getElementById('replay-tutorial-btn'),
+        reminderContinue: document.getElementById('reminder-continue-btn'),
+        reminderSettings: document.getElementById('reminder-settings-btn'),
+        tutorialSkip: document.getElementById('tutorial-skip-btn'),
+        tutorialPrev: document.getElementById('tutorial-prev-btn'),
+        tutorialNext: document.getElementById('tutorial-next-btn'),
+    };
+    
+    // Side Menu
+    const sideMenuContainer = document.getElementById('side-menu-container');
+    const sideMenu = document.getElementById('side-menu');
+    const sideMenuOverlay = document.getElementById('side-menu-overlay');
+
+    const appTitle = document.getElementById('app-title');
+    const shapeVisualizer = document.getElementById('shape-visualizer');
+    const instructionText = document.getElementById('instruction-text');
+    const timerText = document.getElementById('timer-text');
+    const stepCountdownText = document.getElementById('step-countdown-text');
+    const startQuote = { text: document.getElementById('start-quote-text'), author: document.getElementById('start-quote-author') };
+    
+    // Settings Panel
+    const settingsPanel = document.getElementById('settings-panel');
+    const scrollIndicator = document.getElementById('scroll-indicator');
+    const settingsTabs = {
+        sessions: document.getElementById('tab-sessions'),
+        appearance: document.getElementById('tab-appearance'),
+        about: document.getElementById('tab-about'),
+    };
+    const settingsContents = {
+        sessions: document.getElementById('sessions-settings-content'),
+        appearance: document.getElementById('appearance-settings-content'),
+        about: document.getElementById('about-settings-content'),
+    }
+    const subSettingsTabs = {
+        breathing: document.getElementById('sub-tab-breathing'),
+        focus: document.getElementById('sub-tab-focus'),
+    };
+    const subSettingsContents = {
+        breathing: document.getElementById('breathing-settings-content'),
+        focus: document.getElementById('focus-settings-content'),
+    };
+
+    // Settings Inputs
+    const audioToggle = document.getElementById('audio-toggle');
+    const volumeSlider = document.getElementById('volume-slider');
+    const focusAudioToggle = document.getElementById('focus-audio-toggle');
+
+    // Learn Tab
+    const learnMethodList = document.getElementById('learn-method-list');
+    const learnSummaryText = document.getElementById('learn-summary-text');
+    const learnSummaryContainer = document.getElementById('learn-summary-container');
+
+    // Focus Screen
+    const focusTimerDisplay = document.getElementById('focus-timer-display');
+    const focusTimerMessage = document.getElementById('focus-timer-message');
+
+    // Breathing Session Screen
+    const sessionInstructions = document.getElementById('session-instructions');
+    const sessionActiveControls = document.getElementById('session-active-controls');
+
+    // Progress Screen
+    const statsTotalSessions = document.getElementById('stats-total-sessions');
+    const statsTotalTime = document.getElementById('stats-total-time');
+    const statsStreak = document.getElementById('stats-streak');
+    const recentSessionsList = document.getElementById('recent-sessions-list');
+
+    // Modals
+    const breathingSettingsModal = document.getElementById('breathing-settings-modal');
+
+    // Tutorial Elements
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+    const tutorialSpotlight = document.getElementById('tutorial-spotlight');
+    const tutorialModal = document.getElementById('tutorial-modal');
+    const tutorialTitle = document.getElementById('tutorial-title');
+    const tutorialText = document.getElementById('tutorial-text');
+    const tutorialSkipBtn = document.getElementById('tutorial-skip-btn');
+    const tutorialPrevBtn = document.getElementById('tutorial-prev-btn');
+    const tutorialNextBtn = document.getElementById('tutorial-next-btn');
+
+    // --- STATE MANAGEMENT ---
+    let appState = { 
+        settings: { 
+            method: '4-7-8', 
+            shape: 'circle', 
+            theme: 'constellation', 
+            accentColor: 'fuchsia', 
+            duration: 60, 
+            audioEnabled: false, 
+            volume: -10,
+            focus: {
+                duration: 1500,
+                audioEnabled: true,
+            },
+            roastModeEnabled: false,
+            _originalTheme: 'constellation',
+            _originalColor: 'fuchsia'
+        }, 
+        session: { isRunning: false, isPaused: false, timerId: null, cycleTimeoutId: null, stepCountdownIntervalId: null, timeRemaining: 0, currentStep: 0 },
+        focusSession: { isRunning: false, isPaused: false, timerId: null, timeRemaining: 0, },
+        progress: {
+            sessions: [], // { type: 'Breathing: 4-7-8', duration: 60, date: '2023-10-27T10:00:00.000Z' }
+        },
+        flags: {
+            hasSeenTutorial: false,
+            hasSeenBreathingReminder: false,
+        }
+    };
+    let animationFrameId;
+    let synth;
+
+    // --- SETTINGS PERSISTENCE (localStorage) ---
+    function saveState() {
+        try {
+            const stateToSave = {
+                settings: appState.settings,
+                progress: appState.progress,
+                flags: appState.flags
+            };
+            localStorage.setItem('signal-state', JSON.stringify(stateToSave));
+        } catch (e) {
+            console.error("Could not save state to localStorage.", e);
+        }
+    }
+
+    function loadState() {
+        try {
+            const savedState = localStorage.getItem('signal-state');
+            if (savedState) {
+                const loadedState = JSON.parse(savedState);
+                appState.settings = Object.assign({}, appState.settings, loadedState.settings);
+                appState.progress = Object.assign({}, appState.progress, loadedState.progress);
+                appState.flags = Object.assign({}, appState.flags, loadedState.flags);
+            }
+        } catch (e) {
+            console.error("Could not load state from localStorage.", e);
+        }
+    }
+
+    // --- AUDIO SETUP ---
+    function setupAudio() {
+        if (!synth) {
+            synth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 } }).toDestination();
+        }
+        synth.volume.value = appState.settings.volume;
+    }
+    
+    // --- SCREEN NAVIGATION ---
+    function showScreen(screenName) {
+        if (appState.focusSession.isRunning) {
+            resetFocusTimer();
+        }
+
+        Object.values(screens).forEach(screen => {
+            if(screen) screen.classList.add('hidden', 'opacity-0');
+        });
+
+        if(screens[screenName]) {
+            screens[screenName].classList.remove('hidden');
+            setTimeout(() => screens[screenName].classList.remove('opacity-0'), 50);
+        }
+
+        if (screenName === 'start') {
+            sideMenuContainer.classList.remove('hidden');
+        } else {
+            sideMenuContainer.classList.add('hidden');
+        }
+        
+        if(screenName === 'progress') {
+            updateProgressScreen();
+        }
+        
+        themes[appState.settings.theme].renderer();
+        if (screenName === 'settings') setTimeout(checkScrollIndicator, 100);
+        
+        hideSideMenu();
+    }
+
+    // --- MAIN MENU LOGIC ---
+    function toggleSideMenu() {
+        const isHidden = sideMenu.classList.contains('-translate-x-full');
+        if (isHidden) {
+            sideMenu.classList.remove('-translate-x-full');
+            sideMenuOverlay.classList.remove('hidden');
+        } else {
+            hideSideMenu();
+        }
+    }
+
+    function hideSideMenu() {
+        sideMenu.classList.add('-translate-x-full');
+        sideMenuOverlay.classList.add('hidden');
+    }
+
+    // --- THEME APPLICATION ---
+    function applyTheme() {
+        const isRoast = appState.settings.roastModeEnabled;
+        const themeKey = isRoast ? 'dunes' : appState.settings.theme;
+        const colorKey = isRoast ? 'rose' : appState.settings.accentColor;
+        
+        const color = themes[themeKey].colors[colorKey];
+        
+        const titleColorClass = color.text;
+        appTitle.classList.remove('text-fuchsia-400', 'text-cyan-400', 'text-lime-400', 'text-teal-300', 'text-sky-300', 'text-indigo-300', 'text-yellow-400', 'text-amber-400', 'text-rose-400');
+        appTitle.classList.add(titleColorClass);
+
+        const btnBaseClasses = {
+            start: 'w-64 px-8 py-4 text-xl font-bold rounded-full shadow-lg transform hover:scale-105 transition-all duration-300',
+            secondary: 'px-4 py-2 text-sm rounded-lg font-semibold',
+            session: 'px-6 py-2 text-sm rounded-full font-semibold transition-all',
+            sessionIcon: 'w-10 h-10 flex items-center justify-center rounded-full transition-all',
+            menu: `text-left p-3 rounded-lg text-lg ${color.hover}`,
+            tutorial: 'px-4 py-1.5 rounded-lg text-sm'
+        };
+        const neonBtnClasses = `bg-black/20 border-2 ${color.btn} ${color.hover} ${color.text}`.split(' ').filter(Boolean);
+        
+        // Apply to specific buttons
+        ['focusStart', 'sessionStart'].forEach(key => {
+            if(buttons[key]) buttons[key].className = `${btnBaseClasses.start} ${neonBtnClasses.join(' ')}`;
+        });
+        ['focusBack', 'sessionBack', 'progressBack', 'reminderContinue', 'reminderSettings', 'replayTutorial'].forEach(key => {
+            if(buttons[key]) buttons[key].className = `${btnBaseClasses.secondary} ${neonBtnClasses.join(' ')}`;
+        });
+        ['tutorialPrev', 'tutorialNext'].forEach(key => {
+            if(buttons[key]) buttons[key].className = `${btnBaseClasses.tutorial} ${neonBtnClasses.join(' ')}`;
+        });
+        ['focusReset'].forEach(key => {
+             if(buttons[key]) buttons[key].className = `${btnBaseClasses.session} ${neonBtnClasses.join(' ')}`;
+        });
+        ['focusPause', 'pauseResume'].forEach(key => {
+            if(buttons[key]) buttons[key].className = `${btnBaseClasses.sessionIcon} ${neonBtnClasses.join(' ')}`;
+        });
+        ['menuBreathing', 'menuFocus', 'menuProgress', 'menuSettings'].forEach(key => {
+            if(buttons[key]) buttons[key].className = `${btnBaseClasses.menu} ${color.text}`;
+        });
+        
+        buttons.settingsClose.className = 'absolute top-3 right-3 text-2xl text-white/50 hover:text-white z-20';
+        buttons.mainMenuToggle.className = `absolute top-0 left-0 m-4 w-12 h-12 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm z-40 ${color.btn} ${color.text} ${color.hover}`;
+        
+        buttons.endSession.classList.add('hidden');
+        buttons.focusPause.classList.add('hidden');
+        buttons.focusReset.classList.add('hidden');
+
+        const shapeDiv = shapeVisualizer.querySelector('div, svg');
+        if (shapeDiv) {
+            shapeDiv.className = '';
+            const mainClasses = `bg-transparent ${color.main}`.split(' ').filter(Boolean);
+            if (appState.settings.shape !== 'square') shapeDiv.classList.add(...mainClasses);
+            
+            instructionText.className = 'text-xl sm:text-2xl font-medium h-8';
+            stepCountdownText.className = 'text-2xl sm:text-3xl font-bold mt-2 h-12 sm:h-14';
+            instructionText.classList.add(color.text);
+            stepCountdownText.classList.add(color.text);
+            shapeVisualizer.className = 'w-full h-full';
+            shapeVisualizer.classList.add(color.glow);
+        }
+
+        focusTimerDisplay.className = `text-7xl sm:text-9xl font-bold ${color.text} ${color.glow}`;
+        focusTimerMessage.className = `text-2xl sm:text-3xl font-medium mb-4 h-8 ${color.text}`;
+    }
+
+    // --- SETTINGS & LEARN LOGIC ---
+    function setupOptionSelectors() {
+        const methodOptionsContainer = document.getElementById('method-options');
+        methodOptionsContainer.innerHTML = '';
+        Object.entries(breathingMethods).forEach(([key, value]) => {
+            const button = document.createElement('button');
+            button.dataset.value = key;
+            button.className = 'option-btn p-2 rounded-lg text-center text-xs';
+            button.innerHTML = `<span class="font-bold text-sm">${value.name}</span><br><span class="text-gray-300">${value.short}</span>`;
+            methodOptionsContainer.appendChild(button);
+        });
+        methodOptionsContainer.addEventListener('click', e => {
+            const button = e.target.closest('.option-btn'); if (!button) return;
+            appState.settings.method = button.dataset.value;
+            document.querySelectorAll(`#method-options .option-btn`).forEach(btn => btn.classList.remove('selected-option'));
+            button.classList.add('selected-option');
+            saveState();
+        });
+        document.getElementById('shape-options').addEventListener('click', e => {
+            const button = e.target.closest('.option-btn'); if (!button) return;
+            appState.settings.shape = button.dataset.value;
+            document.querySelectorAll(`#shape-options .option-btn`).forEach(btn => btn.classList.remove('selected-option'));
+            button.classList.add('selected-option');
+            saveState();
+        });
+        document.getElementById('theme-options').addEventListener('click', e => {
+            const button = e.target.closest('.option-btn'); if (!button) return;
+            appState.settings.theme = button.dataset.value;
+            appState.settings._originalTheme = button.dataset.value;
+            const newColors = themes[button.dataset.value].colors;
+            appState.settings.accentColor = Object.keys(newColors)[0];
+            appState.settings._originalColor = appState.settings.accentColor;
+            populateAccentColors();
+            applyTheme();
+            themes[appState.settings.theme].renderer();
+            document.querySelectorAll(`#theme-options .option-btn`).forEach(btn => btn.classList.remove('selected-option'));
+            button.classList.add('selected-option');
+            saveState();
+        });
+        document.getElementById('color-options').addEventListener('click', e => {
+            const button = e.target.closest('.option-btn'); if (!button) return;
+            appState.settings.accentColor = button.dataset.value;
+            appState.settings._originalColor = button.dataset.value;
+            document.querySelectorAll(`#color-options .option-btn`).forEach(btn => btn.classList.remove('selected-option'));
+            button.classList.add('selected-option');
+            applyTheme();
+            themes[appState.settings.theme].renderer();
+            saveState();
+        });
+        document.getElementById('duration-options').addEventListener('click', e => {
+            const button = e.target.closest('.option-btn'); if (!button) return;
+            appState.settings.duration = button.dataset.value;
+            document.querySelectorAll(`#duration-options .option-btn`).forEach(btn => btn.classList.remove('selected-option'));
+            button.classList.add('selected-option');
+            saveState();
+        });
+        document.getElementById('focus-duration-options').addEventListener('click', e => {
+            const button = e.target.closest('.option-btn'); if (!button) return;
+            appState.settings.focus.duration = parseInt(button.dataset.value, 10);
+            document.querySelectorAll(`#focus-duration-options .option-btn`).forEach(btn => btn.classList.remove('selected-option'));
+            button.classList.add('selected-option');
+            updateFocusTimerDisplay();
+            saveState();
+        });
+        audioToggle.addEventListener('change', (e) => {
+            appState.settings.audioEnabled = e.target.checked;
+            if (e.target.checked && Tone.context.state !== 'running') Tone.start();
+            saveState();
+        });
+        volumeSlider.addEventListener('input', (e) => {
+            appState.settings.volume = e.target.value;
+            if(synth) synth.volume.value = appState.settings.volume;
+            saveState();
+        });
+        focusAudioToggle.addEventListener('change', (e) => {
+            appState.settings.focus.audioEnabled = e.target.checked;
+             if (e.target.checked && Tone.context.state !== 'running') Tone.start();
+            saveState();
+        });
+    }
+    
+    function populateAccentColors() {
+        const colorOptionsContainer = document.getElementById('color-options');
+        colorOptionsContainer.innerHTML = '';
+        const currentThemeColors = themes[appState.settings.theme].colors;
+        Object.entries(currentThemeColors).forEach(([key, value]) => {
+            const button = document.createElement('button');
+            button.dataset.value = key;
+            button.className = `option-btn p-2 h-12 rounded-lg border-2 ${value.main} ${value.text}`;
+            button.textContent = value.name;
+            colorOptionsContainer.appendChild(button);
+        });
+        document.querySelector(`#color-options .option-btn[data-value="${appState.settings.accentColor}"]`).classList.add('selected-option');
+    }
+
+    function populateLearnScreen() {
+        learnMethodList.innerHTML = '';
+        Object.entries(breathingMethods).forEach(([key, value], index) => {
+            const button = document.createElement('button');
+            const color = themes[appState.settings.theme].colors[appState.settings.accentColor];
+            button.className = `learn-method-btn text-left p-3 rounded-lg transition-colors duration-200 border-2 bg-black/20 ${color.btn} ${color.hover}`;
+            button.innerHTML = `<span class="font-bold">${value.name}</span>`;
+            button.onclick = () => {
+                learnSummaryText.textContent = value.summary;
+                learnSummaryContainer.scrollTop = 0;
+                document.querySelectorAll('.learn-method-btn').forEach(btn => btn.classList.remove(color.hover.replace('hover:','')));
+                button.classList.add(color.hover.replace('hover:',''));
+            };
+            learnMethodList.appendChild(button);
+            if (index === 0) button.click();
+        });
+    }
+
+    function checkScrollIndicator() {
+        const color = themes[appState.settings.theme].colors[appState.settings.accentColor];
+        scrollIndicator.classList.remove('text-fuchsia-400', 'text-cyan-400', 'text-lime-400', 'text-teal-300', 'text-sky-300', 'text-indigo-300', 'text-yellow-400', 'text-amber-400', 'text-rose-400');
+        scrollIndicator.classList.add(color.text);
+        if (settingsPanel.scrollHeight > settingsPanel.clientHeight) { scrollIndicator.classList.remove('hidden'); } 
+        else { scrollIndicator.classList.add('hidden'); }
+    }
+
+    // --- SESSION LOGIC ---
+    function prepareBreathingSession() {
+        if (!appState.flags.hasSeenBreathingReminder) {
+            breathingSettingsModal.classList.remove('hidden');
+            breathingSettingsModal.classList.add('flex');
+        } else {
+            showScreen('session');
+        }
+        shapeVisualizer.innerHTML = shapes[appState.settings.shape];
+        applyTheme();
+        buttons.sessionStart.classList.remove('hidden');
+        sessionInstructions.classList.add('hidden');
+        sessionActiveControls.classList.add('hidden');
+    }
+
+    function startBreathingSession() {
+        buttons.sessionStart.classList.add('hidden');
+        sessionInstructions.classList.remove('hidden');
+        sessionActiveControls.classList.remove('hidden');
+        
+        appState.session.isRunning = true;
+        appState.session.isPaused = false;
+        appState.session.currentStep = 0;
+        appState.session.timeRemaining = appState.settings.duration === 'Infinity' ? Infinity : Number(appState.settings.duration);
+        
+        buttons.pauseResume.innerHTML = icons.pause;
+        buttons.endSession.textContent = 'End';
+        updateTimerDisplay();
+        if (appState.session.timeRemaining !== Infinity) appState.session.timerId = setInterval(countdown, 1000);
+        runBreathingCycle();
+    }
+    
+    function cleanupSession() {
+        appState.session.isRunning = false;
+        clearTimeout(appState.session.cycleTimeoutId);
+        clearInterval(appState.session.timerId);
+        clearInterval(appState.session.stepCountdownIntervalId);
+        stepCountdownText.textContent = '';
+        instructionText.textContent = '';
+    }
+
+    function endSession() { 
+        cleanupSession(); 
+        showScreen('start'); 
+        logSession('Breathing: ' + breathingMethods[appState.settings.method].name, Number(appState.settings.duration));
+    }
+
+    function togglePause() {
+        appState.session.isPaused = !appState.session.isPaused;
+        buttons.pauseResume.innerHTML = appState.session.isPaused ? icons.play : icons.pause;
+        buttons.endSession.classList.toggle('hidden');
+        if (appState.session.isPaused) {
+            shapeVisualizer.style.transitionDuration = '0.2s';
+            shapeVisualizer.style.opacity = '0.7';
+            clearTimeout(appState.session.cycleTimeoutId);
+            clearInterval(appState.session.stepCountdownIntervalId);
+        } else {
+            shapeVisualizer.style.opacity = '1';
+            runBreathingCycle();
+        }
+    }
+
+    function countdown() {
+        if (appState.session.isPaused || !appState.session.isRunning) return;
+        appState.session.timeRemaining--;
+        updateTimerDisplay();
+        if (appState.session.timeRemaining <= 0) {
+            instructionText.textContent = 'Session Complete!';
+            stepCountdownText.textContent = '';
+            cleanupSession();
+            setTimeout(endSession, 2000);
+        }
+    }
+
+    function updateTimerDisplay() {
+        if (appState.session.timeRemaining === Infinity) { timerText.textContent = 'Continuous'; return; }
+        const minutes = Math.floor(appState.session.timeRemaining / 60);
+        const seconds = appState.session.timeRemaining % 60;
+        timerText.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function performStep(step) {
+        return new Promise(resolve => {
+            if (!appState.session.isRunning || appState.session.isPaused) return;
+
+            if (appState.settings.roastModeEnabled) {
+                let roastType;
+                if (step.text.includes("In")) roastType = 'in';
+                else if (step.text.includes("Hold")) roastType = 'hold';
+                else roastType = 'out';
+                const roastArray = roasts.breathing[roastType];
+                instructionText.textContent = roastArray[Math.floor(Math.random() * roastArray.length)];
+                if(appState.settings.audioEnabled) synth.triggerAttackRelease(step.text.includes("In") ? "C3" : "C2", "16n", Tone.now());
+            } else {
+                instructionText.textContent = step.text;
+                if(appState.settings.audioEnabled) synth.triggerAttackRelease(step.text.includes("In") ? "C5" : "C4", "8n", Tone.now());
+            }
+            
+            if (appState.settings.shape === 'box' && breathingMethods[appState.settings.method].name === 'Box') {
+                const boxPath = document.getElementById('box-path');
+                if (boxPath) {
+                    const length = boxPath.getTotalLength(); boxPath.style.transition = 'none';
+                    boxPath.style.strokeDasharray = length;
+                    const offset = (length / 4) * (4 - appState.session.currentStep);
+                    boxPath.style.strokeDashoffset = offset;
+                    setTimeout(() => {
+                        boxPath.style.transition = `stroke-dashoffset ${step.time}s linear`;
+                        boxPath.style.strokeDashoffset = offset - (length / 4);
+                    }, 50);
+                }
+            } else {
+                 shapeVisualizer.style.transform = `scale(${step.scale})`;
+                 shapeVisualizer.style.transitionDuration = `${step.time}s`;
+            }
+            let timeLeftInStep = Math.ceil(step.time);
+            stepCountdownText.textContent = timeLeftInStep;
+            clearInterval(appState.session.stepCountdownIntervalId);
+            appState.session.stepCountdownIntervalId = setInterval(() => {
+                timeLeftInStep--;
+                if(appState.session.isRunning && !appState.session.isPaused) stepCountdownText.textContent = timeLeftInStep > 0 ? timeLeftInStep : '';
+                if (timeLeftInStep <= 0) clearInterval(appState.session.stepCountdownIntervalId);
+            }, 1000);
+            appState.session.cycleTimeoutId = setTimeout(resolve, step.time * 1000);
+        });
+    }
+
+    async function runBreathingCycle() {
+        if (!appState.session.isRunning || appState.session.isPaused) return;
+        const method = breathingMethods[appState.settings.method];
+        const step = method.steps[appState.session.currentStep];
+        await performStep(step);
+        if (appState.session.isRunning && !appState.session.isPaused) {
+            appState.session.currentStep = (appState.session.currentStep + 1) % method.steps.length;
+            runBreathingCycle();
+        }
+    }
+
+    // --- FOCUS TIMER LOGIC ---
+    function prepareFocusScreen() {
+        appState.focusSession.timeRemaining = appState.settings.focus.duration;
+        updateFocusTimerDisplay();
+        showScreen('focus');
+    }
+
+    function startFocusTimer() {
+        appState.focusSession.isRunning = true;
+        appState.focusSession.isPaused = false;
+        appState.focusSession.timeRemaining = appState.focusSession.timeRemaining > 0 ? appState.focusSession.timeRemaining : appState.settings.focus.duration;
+        
+        if(appState.settings.roastModeEnabled) {
+            const roastArray = roasts.focus.start;
+            focusTimerMessage.textContent = roastArray[Math.floor(Math.random() * roastArray.length)];
+        }
+
+        buttons.focusStart.classList.add('hidden');
+        buttons.focusPause.classList.remove('hidden');
+        buttons.focusReset.classList.remove('hidden');
+        buttons.focusPause.innerHTML = icons.pause;
+
+        appState.focusSession.timerId = setInterval(focusTimerTick, 1000);
+    }
+
+    function toggleFocusPause() {
+        appState.focusSession.isPaused = !appState.focusSession.isPaused;
+        buttons.focusPause.innerHTML = appState.focusSession.isPaused ? icons.play : icons.pause;
+        if(appState.settings.roastModeEnabled && appState.focusSession.isPaused) {
+            const roastArray = roasts.focus.paused;
+            focusTimerMessage.textContent = roastArray[Math.floor(Math.random() * roastArray.length)];
+        } else {
+             focusTimerMessage.textContent = appState.focusSession.isPaused ? "Paused" : "";
+        }
+    }
+
+    function resetFocusTimer() {
+        clearInterval(appState.focusSession.timerId);
+        appState.focusSession.isRunning = false;
+        appState.focusSession.isPaused = false;
+        appState.focusSession.timeRemaining = appState.settings.focus.duration;
+        updateFocusTimerDisplay();
+        buttons.focusStart.classList.remove('hidden');
+        buttons.focusPause.classList.add('hidden');
+        buttons.focusReset.classList.add('hidden');
+        focusTimerMessage.textContent = '';
+    }
+
+    function focusTimerTick() {
+        if (appState.focusSession.isPaused || !appState.focusSession.isRunning) return;
+        appState.focusSession.timeRemaining--;
+        updateFocusTimerDisplay();
+        if (appState.focusSession.timeRemaining <= 0) {
+            clearInterval(appState.focusSession.timerId);
+            appState.focusSession.isRunning = false;
+
+            logSession('Focus', appState.settings.focus.duration);
+
+            if (appState.settings.roastModeEnabled) {
+                const roastArray = roasts.focus.complete;
+                focusTimerMessage.textContent = roastArray[Math.floor(Math.random() * roastArray.length)];
+                if (Tone.context.state !== 'running') Tone.start();
+                synth.triggerAttackRelease("C#2", "0.5s", Tone.now());
+            } else {
+                focusTimerMessage.textContent = "Focus Complete!";
+                if (appState.settings.focus.audioEnabled) {
+                     if (Tone.context.state !== 'running') Tone.start();
+                     synth.triggerAttackRelease("C5", "0.5s", Tone.now());
+                     synth.triggerAttackRelease("G5", "0.5s", Tone.now() + 0.5);
+                }
+            }
+            setTimeout(() => { resetFocusTimer(); showScreen('start'); }, 4000);
+        }
+    }
+
+    function updateFocusTimerDisplay() {
+        const time = appState.focusSession.timeRemaining > 0 ? appState.focusSession.timeRemaining : appState.settings.focus.duration;
+        const minutes = Math.floor(time / 60);
+        const seconds = time % 60;
+        focusTimerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // --- PROGRESS TRACKING ---
+    function logSession(type, duration) {
+        if(duration === 'Infinity') return;
+        appState.progress.sessions.unshift({
+            type: type,
+            duration: duration,
+            date: new Date().toISOString()
+        });
+        // Keep only the last 100 sessions
+        if(appState.progress.sessions.length > 100) {
+            appState.progress.sessions.pop();
+        }
+        saveState();
+    }
+
+    function updateProgressScreen() {
+        const { sessions } = appState.progress;
+        
+        // Total Sessions
+        statsTotalSessions.textContent = sessions.length;
+
+        // Total Time
+        const totalSeconds = sessions.reduce((acc, s) => acc + s.duration, 0);
+        statsTotalTime.textContent = Math.round(totalSeconds / 60);
+        
+        // Streak
+        statsStreak.textContent = calculateStreak();
+
+        // Recent Sessions
+        if (sessions.length === 0) {
+            recentSessionsList.innerHTML = `<p class="text-center text-white/40">No sessions completed yet.</p>`;
+            return;
+        }
+
+        recentSessionsList.innerHTML = sessions.slice(0, 20).map(s => {
+            const date = new Date(s.date);
+            const durationMins = Math.round(s.duration / 60);
+            return `
+                <div class="flex justify-between items-center p-3 border-b border-white/10 text-sm">
+                    <div>
+                        <p class="font-semibold">${s.type}</p>
+                        <p class="text-xs text-white/50">${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</p>
+                    </div>
+                    <p class="font-semibold">${durationMins} min</p>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function calculateStreak() {
+        const { sessions } = appState.progress;
+        if (sessions.length === 0) return 0;
+
+        const uniqueDays = [...new Set(sessions.map(s => new Date(s.date).toDateString()))];
+        uniqueDays.sort((a,b) => new Date(b) - new Date(a));
+        
+        let streak = 0;
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+
+        if (new Date(uniqueDays[0]).toDateString() === today.toDateString() || new Date(uniqueDays[0]).toDateString() === yesterday.toDateString()) {
+             streak = 1;
+             for (let i = 0; i < uniqueDays.length - 1; i++) {
+                const currentDay = new Date(uniqueDays[i]);
+                const nextDay = new Date(uniqueDays[i+1]);
+                const diffTime = currentDay - nextDay;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (diffDays === 1) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+        }
+        return streak;
+    }
+
+
+    // --- ROAST MODE TOGGLE ---
+    function toggleRoastMode() {
+        appState.settings.roastModeEnabled = !appState.settings.roastModeEnabled;
+        if (appState.settings.roastModeEnabled) {
+            appTitle.textContent = "Tough Love";
+            if (Tone.context.state !== 'running') Tone.start();
+            synth.triggerAttackRelease("C#3", "8n", Tone.now());
+        } else {
+            appTitle.textContent = "Signal";
+            if (Tone.context.state !== 'running') Tone.start();
+            synth.triggerAttackRelease("C5", "8n", Tone.now());
+        }
+        applyTheme();
+        themes[appState.settings.theme].renderer();
+        saveState();
+    }
+    
+    // --- TUTORIAL LOGIC ---
+    const tutorialSteps = [
+        {
+            element: '#main-menu-toggle',
+            title: 'Welcome to Signal!',
+            text: 'This is your main menu. Use it to navigate between breathing, focus, and other sections.'
+        },
+        {
+            element: '#app-title',
+            title: 'The Secret Mode',
+            text: 'Try tapping the title a few times. You might find something... motivational.'
+        },
+        {
+            element: '#settings-screen',
+            title: 'You\'re All Set!',
+            text: 'You can customize everything in the settings. Enjoy finding your signal!',
+            isCentered: true
+        }
+    ];
+
+    let currentTutorialStep = 0;
+
+    function startTutorial() {
+        currentTutorialStep = 0;
+        tutorialOverlay.classList.remove('hidden');
+        showTutorialStep(currentTutorialStep);
+    }
+
+    function showTutorialStep(index) {
+        const step = tutorialSteps[index];
+        const targetElement = document.querySelector(step.element);
+
+        if (step.isCentered) {
+            tutorialSpotlight.style.display = 'none';
+        } else if (targetElement) {
+            tutorialSpotlight.style.display = 'block';
+            const rect = targetElement.getBoundingClientRect();
+            tutorialSpotlight.style.width = `${rect.width + 16}px`;
+            tutorialSpotlight.style.height = `${rect.height + 16}px`;
+            tutorialSpotlight.style.top = `${rect.top - 8}px`;
+            tutorialSpotlight.style.left = `${rect.left - 8}px`;
+        }
+
+        tutorialTitle.textContent = step.title;
+        tutorialText.textContent = step.text;
+
+        tutorialPrevBtn.style.visibility = index === 0 ? 'hidden' : 'visible';
+        tutorialNextBtn.textContent = index === tutorialSteps.length - 1 ? 'Finish' : 'Next';
+        
+        tutorialModal.classList.remove('translate-y-[200%]');
+    }
+
+    function endTutorial() {
+        tutorialOverlay.classList.add('hidden');
+        tutorialModal.classList.add('translate-y-[200%]');
+        appState.flags.hasSeenTutorial = true;
+        saveState();
+    }
+
+    // --- ANIMATION RENDERERS ---
+    const canvas = animatedBg; const ctx = canvas.getContext('2d'); let particles = [];
+    function setupCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    function stopAnimation() { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+    function animateConstellation() {
+        stopAnimation(); setupCanvas(); particles = [];
+        const starCount = Math.floor((canvas.width * canvas.height) / 15000);
+        for (let i = 0; i < starCount; i++) { particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, radius: Math.random() * 1.5 + 0.5 }); }
+        function loop() {
+            animationFrameId = requestAnimationFrame(loop);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const color = themes[appState.settings.theme].colors[appState.settings.accentColor];
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.strokeStyle = color.stroke;
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0 || p.x > canvas.width) p.vx = -p.vx;
+                if (p.y < 0 || p.y > canvas.height) p.vy = -p.vy;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
+            });
+            for (let i = 0; i < particles.length; i++) { for (let j = i + 1; j < particles.length; j++) { const dist = Math.hypot(particles[i].x - particles[j].x, particles[i].y - particles[j].y); if (dist < 100) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke(); } } }
+        }
+        loop();
+    }
+    function animateOcean() {
+        stopAnimation(); setupCanvas(); const waves = []; const waveCount = 5;
+        for (let i = 0; i < waveCount; i++) { waves.push({ y: canvas.height / 2 + (i * 50), length: 0.01 + (i * 0.005), amplitude: 20 + (i * 10), speed: 0.02 + (i * 0.002) }); }
+        let step = 0;
+        function loop() {
+            animationFrameId = requestAnimationFrame(loop);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const color = themes[appState.settings.theme].colors[appState.settings.accentColor];
+            ctx.strokeStyle = color.stroke; ctx.lineWidth = 2;
+            waves.forEach(wave => {
+                ctx.beginPath(); ctx.moveTo(0, wave.y);
+                for (let i = 0; i < canvas.width; i++) { ctx.lineTo(i, wave.y + Math.sin(i * wave.length + step) * wave.amplitude); }
+                ctx.stroke();
+            });
+            step += 0.02;
+        }
+        loop();
+    }
+    function animateDunes() {
+        stopAnimation(); setupCanvas(); particles = [];
+        const particleCount = Math.floor((canvas.width * canvas.height) / 10000);
+        for(let i = 0; i < particleCount; i++) { particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, life: Math.random() * 100 }); }
+        function loop() {
+            animationFrameId = requestAnimationFrame(loop);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const themeKey = appState.settings.roastModeEnabled ? 'dunes' : appState.settings.theme;
+            const colorKey = appState.settings.roastModeEnabled ? 'rose' : appState.settings.accentColor;
+            const color = themes[themeKey].colors[colorKey];
+            ctx.fillStyle = color.stroke;
+            particles.forEach(p => {
+                const angle = Math.sin(p.x / 200) * 0.5 + Math.cos(p.y / 200) * 0.5;
+                p.x += Math.cos(angle) * 1.5; p.y += Math.sin(angle) * 1.5; p.life--;
+                if(p.life <= 0) { p.x = Math.random() * canvas.width; p.y = Math.random() * canvas.height; p.life = Math.random() * 100; }
+                ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+        loop();
+    }
+    
+    // --- INITIALIZATION ---
+    function setStartQuote() {
+        const newQuote = quotes[Math.floor(Math.random() * quotes.length)];
+        startQuote.text.textContent = `"${newQuote.text}"`;
+        startQuote.author.textContent = `- ${newQuote.author}`;
+    }
+
+    function initialize() {
+        loadState();
+
+        if (appState.settings.roastModeEnabled) {
+            appTitle.textContent = "Tough Love";
+        }
+
+        let clickCount = 0;
+        let clickTimer = null;
+        appTitle.addEventListener('click', () => {
+            clickCount++;
+            if (clickCount === 5) {
+                clearTimeout(clickTimer);
+                clickCount = 0;
+                toggleRoastMode();
+            } else {
+                clearTimeout(clickTimer);
+                clickTimer = setTimeout(() => { clickCount = 0; }, 400);
+            }
+        });
+
+        // Menu Listeners
+        buttons.mainMenuToggle.addEventListener('click', toggleSideMenu);
+        sideMenuOverlay.addEventListener('click', hideSideMenu);
+        buttons.menuBreathing.addEventListener('click', () => prepareBreathingSession());
+        buttons.menuFocus.addEventListener('click', () => prepareFocusScreen());
+        buttons.menuProgress.addEventListener('click', () => showScreen('progress'));
+        buttons.menuSettings.addEventListener('click', () => showScreen('settings'));
+        
+        // Back/Close Button Listeners
+        buttons.settingsClose.addEventListener('click', () => showScreen('start'));
+        buttons.focusBack.addEventListener('click', () => showScreen('start'));
+        buttons.sessionBack.addEventListener('click', () => { cleanupSession(); showScreen('start'); });
+        buttons.progressBack.addEventListener('click', () => showScreen('start'));
+        
+        // Session Controls
+        buttons.sessionStart.addEventListener('click', startBreathingSession);
+        buttons.pauseResume.addEventListener('click', togglePause);
+        buttons.endSession.addEventListener('click', endSession);
+
+        // Focus Timer Controls
+        buttons.focusStart.addEventListener('click', startFocusTimer);
+        buttons.focusPause.addEventListener('click', toggleFocusPause);
+        buttons.focusReset.addEventListener('click', resetFocusTimer);
+        
+        // Settings Tabs
+        Object.entries(settingsTabs).forEach(([key, tab]) => {
+            tab.addEventListener('click', () => {
+                Object.values(settingsTabs).forEach(t => t.classList.remove('tab-active'));
+                Object.values(settingsContents).forEach(c => c.classList.add('hidden'));
+                tab.classList.add('tab-active');
+                settingsContents[key].classList.remove('hidden');
+                
+                // Default to breathing sub-tab if sessions is clicked
+                if (key === 'sessions') {
+                    subSettingsTabs.breathing.click();
+                }
+                checkScrollIndicator();
+            });
+        });
+        
+        // Settings Sub-Tabs
+        Object.entries(subSettingsTabs).forEach(([key, tab]) => {
+            tab.addEventListener('click', () => {
+                Object.values(subSettingsTabs).forEach(t => t.classList.remove('tab-active'));
+                Object.values(subSettingsContents).forEach(c => c.classList.add('hidden'));
+                tab.classList.add('tab-active');
+                subSettingsContents[key].classList.remove('hidden');
+                checkScrollIndicator();
+            });
+        });
+
+        // Breathing Settings Reminder Modal
+        buttons.reminderContinue.addEventListener('click', () => {
+            breathingSettingsModal.classList.add('hidden');
+            appState.flags.hasSeenBreathingReminder = true;
+            saveState();
+            showScreen('session');
+        });
+        buttons.reminderSettings.addEventListener('click', () => {
+            breathingSettingsModal.classList.add('hidden');
+            appState.flags.hasSeenBreathingReminder = true;
+            saveState();
+            showScreen('settings');
+            settingsTabs.sessions.click(); // Switch to sessions tab
+            subSettingsTabs.breathing.click(); // Switch to breathing sub-tab
+        });
+
+        // Tutorial Buttons
+        tutorialSkipBtn.addEventListener('click', endTutorial);
+        tutorialNextBtn.addEventListener('click', () => {
+            currentTutorialStep++;
+            if (currentTutorialStep >= tutorialSteps.length) {
+                endTutorial();
+            } else {
+                showTutorialStep(currentTutorialStep);
+            }
+        });
+        tutorialPrevBtn.addEventListener('click', () => {
+            currentTutorialStep--;
+            if (currentTutorialStep < 0) currentTutorialStep = 0;
+            showTutorialStep(currentTutorialStep);
+        });
+        buttons.replayTutorial.addEventListener('click', () => {
+            showScreen('start');
+            setTimeout(startTutorial, 500);
+        });
+
+        setupOptionSelectors();
+        populateAccentColors();
+        populateLearnScreen(); // Populate learn content once
+        setupAudio();
+        
+        // Set UI from loaded state
+        document.querySelector(`#method-options .option-btn[data-value="${appState.settings.method}"]`).classList.add('selected-option');
+        document.querySelector(`#shape-options .option-btn[data-value="${appState.settings.shape}"]`).classList.add('selected-option');
+        document.querySelector(`#theme-options .option-btn[data-value="${appState.settings.theme}"]`).classList.add('selected-option');
+        document.querySelector(`#color-options .option-btn[data-value="${appState.settings.accentColor}"]`).classList.add('selected-option');
+        document.querySelector(`#duration-options .option-btn[data-value="${appState.settings.duration}"]`).classList.add('selected-option');
+        document.querySelector(`#focus-duration-options .option-btn[data-value="${appState.settings.focus.duration}"]`).classList.add('selected-option');
+        audioToggle.checked = appState.settings.audioEnabled;
+        volumeSlider.value = appState.settings.volume;
+        focusAudioToggle.checked = appState.settings.focus.audioEnabled;
+        settingsTabs.sessions.click();
+        
+        applyTheme();
+        setStartQuote();
+        showScreen('start');
+        
+        if (!appState.flags.hasSeenTutorial) {
+            setTimeout(startTutorial, 1000);
+        }
+        
+        window.addEventListener('resize', () => { 
+            themes[appState.settings.theme].renderer(); 
+            if(screens.settings.classList.contains('hidden')) return;
+            checkScrollIndicator(); 
+        });
+    }
+    
+    initialize();
+});
+</script>
+</body>
+</html>
+
+
+
+
